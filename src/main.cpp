@@ -1,7 +1,7 @@
 ﻿// PacmanConsole.cpp: определяет точку входа для приложения.
 //
 
-#include "main.h"
+#include <includes.h>
 
 using namespace std::chrono;
 
@@ -40,7 +40,7 @@ int main()
 			"Host: example.com\r\n"
 			"Connection: close\r\n\r\n";
 
-		socket.write_some(asio::buffer(sRequest.data(), sRequest.size()), ec);
+		std::cout << "Number of bytes sent: " << socket.write_some(asio::buffer(sRequest.data(), sRequest.size()), ec) << '\n';
 
 		const size_t bytes = socket.available();
 		std::cout << "Bytes available: " << bytes << '\n';
