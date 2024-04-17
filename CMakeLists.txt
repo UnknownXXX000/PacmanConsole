@@ -21,7 +21,7 @@ set(SOURCES
 
 # Add header files
 set (HEADERS
-    "include/main.h"
+    "include/includes.h"
 )
 
 set(CMAKE_CXX_STANDARD 20)
