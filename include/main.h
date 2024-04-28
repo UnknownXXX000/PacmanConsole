@@ -11,11 +11,6 @@
 #define ASIO_STANDALONE
 #endif
 
-#include <iostream>
-#include <chrono>
-#include <vector>
-#include <random>
-#include <string>
 
 // TODO: установите здесь ссылки на дополнительные заголовки, требующиеся для программы.
 
@@ -27,4 +22,7 @@
 #include <curses.h>
 #endif
 
-#include <asio.hpp>
+#include <string>
+#include <argparse.hpp>
+
+#include "net_includes.h"
