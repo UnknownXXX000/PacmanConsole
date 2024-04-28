@@ -1,10 +1,7 @@
-﻿// PacmanConsole.h : включаемый файл для стандартных системных включаемых файлов
-// или включаемые файлы для конкретного проекта.
-
 #pragma once
 
 #if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
-    /* UNIX-style OS. ------------------------------------------- */
+/* UNIX-style OS. ------------------------------------------- */
 #define IS_UNIX 1
 #elif defined(_WIN32) || defined(WIN32) || defined(__WIN32__)
 // Windows
@@ -25,7 +22,7 @@
 #include <random>
 #include <string>
 
-// TODO: установите здесь ссылки на дополнительные заголовки, требующиеся для программы.
+// TODO: ���������� ����� ������ �� �������������� ���������, ����������� ��� ���������.
 
 #ifdef IS_UNIX
     /* UNIX-style OS. ------------------------------------------- */
@@ -35,4 +32,9 @@
 #include "../PDCurses/include/curses.h"
 #endif
 
+#include <argparse.hpp>
+#include <string>
+
 #include <asio.hpp>
+#include <asio/ts/buffer.hpp>
+#include <asio/ts/internet.hpp>

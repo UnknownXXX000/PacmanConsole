@@ -15,18 +15,29 @@ endif()
 
 # Add source files
 set(SOURCES
-    src/main.cpp
+    "src/main.cpp"
     #src/SnakeGame.cpp
 )
 
 # Add header files
 set (HEADERS
-    include/includes.h
-)
+    "include/includes.h"
+ "include/net_message.h" 
+ "include/net_tsqueue.h" 
+ "include/net_connection.h" 
+ "include/net_server.h" 
+ "include/net_client.h" 
+ "include/net_includes.h" 
+ "include/net_common.h" 
+ "include/game_client.h" 
+ "include/game_server.h" 
+ "include/game_structs.h"
+ "argparse/include/argparse.hpp")
 
 include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${PROJECT_SOURCE_DIR}/argparse/include")
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
@@ -38,7 +49,7 @@ if(LINUX OR MACOS)
     find_package(Curses REQUIRED)
     include_directories(${CURSES_INCLUDE_DIR})
     target_link_libraries(ConsolePacmanProject ${CURSES_LIBRARIES})
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASIO_STANDALONE -lncurses -DNCURSES_NOMACROS")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASIO_STANDALONE -lncurses -DNCURSES_NOMACROS -lpthread")
 elseif(WINDOWS)
     set(CURSES_NEED_WIDE TRUE)
     set(PDCurses_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/PDCurses/include")
