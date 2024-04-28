@@ -32,17 +32,17 @@ set (HEADERS
  "include/game_client.h" 
  "include/game_server.h" 
  "include/game_structs.h"
- "argparse/argparse.hpp")
+ "argparse/include/argparse.hpp")
 
 include_directories("${PROJECT_SOURCE_DIR}/include")
-include_directories("${PROJECT_SOURCE_DIR}/argparse")
+include_directories("${PROJECT_SOURCE_DIR}/argparse/include")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 # Add the executable
-add_executable(ConsolePacmanProject ${SOURCES} ${HEADERS} "include/game_structs.h")
+add_executable(ConsolePacmanProject ${SOURCES} ${HEADERS})
 
 # Check and include NCurses or PDCurses
 if(LINUX OR MACOS)
@@ -52,8 +52,8 @@ if(LINUX OR MACOS)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASIO_STANDALONE -lncurses -DNCURSES_NOMACROS -lpthread")
 elseif(WINDOWS)
     set(CURSES_NEED_WIDE TRUE)
-    set(PDCurses_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/include")
-    set(PDCurses_LIBRARIES "${PROJECT_SOURCE_DIR}/lib/pdcurses.lib")
+    set(PDCurses_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/PDCurses/include")
+    set(PDCurses_LIBRARIES "${PROJECT_SOURCE_DIR}/PDCurses/lib/pdcurses.lib")
     include_directories(${PDCurses_INCLUDE_DIRS})
     target_link_libraries(ConsolePacmanProject ${PDCurses_LIBRARIES})
 endif()

@@ -1,8 +1,7 @@
 ﻿// PacmanConsole.cpp: определяет точку входа для приложения.
 //
 
-#include "main.h"
-
+#include <includes.h>
 
 using namespace std::chrono;
 // using namespace std::chrono_literals;
