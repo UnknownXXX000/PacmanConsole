@@ -32,7 +32,7 @@
 #include <ncurses.h>
 #elif defined(IS_WIN)
 // Windows
-#include <curses.h>
+#include "../PDCurses/include/curses.h"
 #endif
 
 #include <asio.hpp>
