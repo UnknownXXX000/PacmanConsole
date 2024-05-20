@@ -9,17 +9,7 @@ namespace net
 	{
 	public:
 		tsqueue() = default;
-		tsqueue(const tsqueue&) = delete;
-		tsqueue& operator=(const tsqueue&) = delete;
-		tsqueue(tsqueue&&) noexcept = default;
-
-		tsqueue& operator=(tsqueue&& other) noexcept
-		{
-			muxQueue = std::move(other.muxQueue);
-			deqQueue = std::move(other.deqQueue);
-			return *this;
-		}
-
+		tsqueue(const tsqueue<T>&) = delete;
 		virtual ~tsqueue() { clear(); }
 
 	public:

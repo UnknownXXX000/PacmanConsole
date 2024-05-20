@@ -3,8 +3,11 @@
 #include "net_tsqueue.h"
 #include "net_message.h"
 
+
 namespace net
 {
+	// Connection
+	// Forward declare
 	template<typename T>
 	class server_interface;
 
@@ -12,38 +15,45 @@ namespace net
 	class connection : public std::enable_shared_from_this<connection<T>>
 	{
 	public:
-		enum class owner : bool
+		// A connection is "owned" by either a server or a client, and its
+		// behaviour is slightly different bewteen the two.
+		enum class owner
 		{
 			server,
 			client
 		};
 
-		connection(owner parent,
-			asio::io_context& asioContext,
-			asio::ip::tcp::socket socket,
-			tsqueue<owned_message<T>>& qIn)
-				:	m_nOwnerType(parent),
-					m_asioContext(asioContext),
-					m_socket(std::move(socket)),
-					m_qMessagesIn(qIn)
+	public:
+		// Constructor: Specify Owner, connect to context, transfer the socket
+		//				Provide reference to incoming message queue
+		connection(owner parent, asio::io_context& asioContext, asio::ip::tcp::socket socket, tsqueue<owned_message<T>>& qIn)
+			: m_asioContext(asioContext), m_socket(std::move(socket)), m_qMessagesIn(qIn), pServer(nullptr)
 		{
-			if (m_nOwnerType == owner::server)
-			{
-				m_nHandshakeOut = static_cast<uint64_t>(std::chrono::system_clock::now().time_since_epoch().count());
-
-				m_nHandshakeCheck = scramble(m_nHandshakeOut);
-			}
-			else
-			{
-				m_nHandshakeIn = 0;
-				m_nHandshakeOut = 0;
-			}
-
+			m_nOwnerType = parent;
 		}
 
 		virtual ~connection()
-		{
+		{}
 
+		// This ID is used system wide - its how clients will understand other clients
+		// exist across the whole system.
+		uint32_t GetID() const
+		{
+			return id;
+		}
+
+	public:
+		void ConnectToClient(net::server_interface<T>* serverPtr, uint32_t uid = 0)
+		{
+			if (m_nOwnerType == owner::server)
+			{
+				if (m_socket.is_open())
+				{
+					pServer = serverPtr;
+					id = uid;
+					ReadHeader();
+				}
+			}
 		}
 
 		void ConnectToServer(const asio::ip::tcp::resolver::results_type& endpoints)
@@ -57,62 +67,55 @@ namespace net
 					{
 						if (!ec)
 						{
-							// ReadHeader();
-
-							ReadValidation();
+							ReadHeader();
 						}
 					});
 			}
 		}
-		
+
+
 		void Disconnect()
 		{
 			if (IsConnected())
 				asio::post(m_asioContext, [this]() { m_socket.close(); });
 		}
 
-		[[nodiscard]] bool IsConnected() const noexcept
+		bool IsConnected() const
 		{
 			return m_socket.is_open();
 		}
 
-		[[nodiscard]] uint32_t GetID() const noexcept
+		// Prime the connection to wait for incoming messages
+		void StartListening()
 		{
-			return id;
+
 		}
 
+	public:
+		// ASYNC - Send a message, connections are one-to-one so no need to specifiy
+		// the target, for a client, the target is the server and vice versa
 		void Send(const message<T>& msg)
 		{
 			asio::post(m_asioContext,
 				[this, msg]()
 				{
-					const bool bWritingMessage = !m_qMessagesOut.empty();
+					// If the queue has a message in it, then we must 
+					// assume that it is in the process of asynchronously being written.
+					// Either way add the message to the queue to be output. If no messages
+					// were available to be written, then start the process of writing the
+					// message at the front of the queue.
+					bool bWritingMessage = !m_qMessagesOut.empty();
 					m_qMessagesOut.push_back(msg);
 					if (!bWritingMessage)
+					{
 						WriteHeader();
-				}
-			);
+					}
+				});
 		}
 
-		void ConnectToClient(net::server_interface<T>* server, uint32_t uid = 0)
-		{
-			if (m_nOwnerType == owner::server)
-			{
-				if (m_socket.is_open())
-				{
-					id = uid;
 
-					// ReadHeader();
-
-					WriteValidation();
-
-					ReadValidation(server);
-				}
-			}
-		}
 
 	private:
-
 		// ASYNC - Prime context to write a message header
 		void WriteHeader()
 		{
@@ -153,7 +156,8 @@ namespace net
 						// for now simply assume the connection has died by closing the
 						// socket. When a future attempt to write to this client fails due
 						// to the closed socket, it will be tidied up.
-						std::cout << '[' << id << "] Write Header Fail.\n";
+						std::cout << "[" << id << "] Write Header Fail.\n";
+						if (m_nOwnerType == owner::server && pServer != nullptr) pServer->OnClientFail(this->shared_from_this());
 						m_socket.close();
 					}
 				});
@@ -184,7 +188,8 @@ namespace net
 					else
 					{
 						// Sending failed, see WriteHeader() equivalent for description :P
-						std::cout << '[' << id << "] Write Body Fail.\n";
+						std::cout << "[" << id << "] Write Body Fail.\n";
+						if (m_nOwnerType == owner::server && pServer != nullptr) pServer->OnClientFail(this->shared_from_this());
 						m_socket.close();
 					}
 				});
@@ -224,6 +229,7 @@ namespace net
 						// Reading form the client went wrong, most likely a disconnect
 						// has occurred. Close the socket and let the system tidy it up later.
 						std::cout << '[' << id << "] Read Header Fail.\n";
+						if (m_nOwnerType == owner::server && pServer != nullptr) pServer->OnClientFail(this->shared_from_this());
 						m_socket.close();
 					}
 				});
@@ -248,6 +254,7 @@ namespace net
 					{
 						// As above!
 						std::cout << '[' << id << "] Read Body Fail.\n";
+						if (m_nOwnerType == owner::server && pServer != nullptr) pServer->OnClientFail(this->shared_from_this());
 						m_socket.close();
 					}
 				});
@@ -269,81 +276,12 @@ namespace net
 			ReadHeader();
 		}
 
-		static uint64_t scramble(const uint64_t& nInput)
-		{
-			uint64_t out = nInput ^ 0xDEADBEEFC0DECAFE;
-			out = (out & 0xF0F0F0F0F0F0F0) >> 4 | (out & 0x0F0F0F0F0F0F0F) << 4;
-			return out ^ 0xC0DEFACE12345678;
-		}
-
-
-		// ASYNC - Used by both client and server to write validation data
-		void WriteValidation()
-		{
-			asio::async_write(m_socket, asio::buffer(&m_nHandshakeOut, sizeof(uint64_t)),
-				[this](std::error_code ec, std::size_t length)
-				{
-					if (!ec)
-					{
-						if (m_nOwnerType == owner::client)
-							ReadHeader();
-					}
-					else
-					{
-						m_socket.close();
-					}
-				}
-			);
-		}
-
-		void ReadValidation(net::server_interface<T>* server = nullptr)
-		{
-			asio::async_read(m_socket, asio::buffer(&m_nHandshakeIn, sizeof(uint64_t)),
-				[this, server](std::error_code ec, std::size_t length)
-				{
-					if (!ec)
-					{
-						if (m_nOwnerType == owner::server)
-						{
-							if (m_nHandshakeIn == m_nHandshakeCheck)
-							{
-								std::cout << "Client validated\n";
-								server->OnClientValidated(this->shared_from_this());
-
-								ReadHeader();
-							}
-							else
-							{
-								std::cout << "Client Disconnected (Fail Validation)\n";
-								m_socket.close();
-							}
-						}
-						else
-						{
-							m_nHandshakeOut = scramble(m_nHandshakeIn);
-
-							WriteValidation();
-						}
-					}
-					else
-					{
-						std::cout << "Client disconnected (Read Validation)\n";
-						m_socket.close();
-					}
-				}
-			);
-		}
-
 	protected:
-
-		// The "owner" decides how some of the connection behaves
-		owner m_nOwnerType = owner::server;
+		// Each connection has a unique socket to a remote 
+		asio::ip::tcp::socket m_socket;
 
 		// This context is shared with the whole asio instance
 		asio::io_context& m_asioContext;
-
-		// Each connection has a unique socket to a remote
-		asio::ip::tcp::socket m_socket;
 
 		// This queue holds all messages to be sent to the remote side
 		// of this connection
@@ -353,13 +291,16 @@ namespace net
 		tsqueue<owned_message<T>>& m_qMessagesIn;
 
 		// Incoming messages are constructed asynchronously, so we will
-// store the part assembled message here, until it is ready
+		// store the part assembled message here, until it is ready
 		message<T> m_msgTemporaryIn;
+
+		// The "owner" decides how some of the connection behaves
+		owner m_nOwnerType = owner::server;
 
 		uint32_t id = 0;
 
-		uint64_t m_nHandshakeOut	= 0;
-		uint64_t m_nHandshakeIn		= 0;
-		uint64_t m_nHandshakeCheck	= 0;
+		// If the connection is owned by server, then provide it with pointer to the server interface
+
+		net::server_interface<T>* pServer = nullptr;
 	};
 }

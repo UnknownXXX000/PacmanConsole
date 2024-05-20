@@ -10,15 +10,14 @@ namespace net
 	class server_interface
 	{
 	public:
-
-		server_interface() = delete;
-
 		// Create a server, ready to listen on specified port
 		server_interface(uint16_t port)
 			: m_asioAcceptor(m_asioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
 		{
 
 		}
+
+		server_interface() = delete;
 
 		virtual ~server_interface()
 		{
@@ -85,6 +84,8 @@ namespace net
 							std::make_shared<connection<T>>(connection<T>::owner::server,
 								m_asioContext, std::move(socket), m_qMessagesIn);
 
+
+
 						// Give the user server a chance to deny connection
 						if (OnClientConnect(newconn))
 						{
@@ -115,6 +116,49 @@ namespace net
 					// another connection...
 					WaitForClientConnection();
 				});
+		}
+
+		void OnClientFail(std::shared_ptr<connection<T>> client)
+		{
+			std::cout << "Client " << client->GetID() << " has failed\n";
+			DisconnectClient(client);
+		}
+
+		void RemoveDisconnectedClients()
+		{
+			for (auto it = m_deqConnections.begin(); it != m_deqConnections.end(); )
+			{
+				if (!((*it) && (*it)->IsConnected()))
+				{
+					// std::cout << "Removed client " << (*it)->GetID() << '\n';
+
+					OnClientDisconnect(*it);
+					(*it).reset();
+					it = m_deqConnections.erase(it);
+				}
+				else
+				{
+					++it;
+				}
+			}
+		}
+
+		// Disconnect client by force
+		void DisconnectClient(std::shared_ptr<connection<T>> client)
+		{
+			// If we cant communicate with client then we may as 
+			// well remove the client - let the server know, it may
+			// be tracking it somehow
+			OnClientDisconnect(client);
+
+			// client->Disconnect();
+
+			// Off you go now, bye bye!
+			client.reset();
+
+			// Then physically remove it from the container
+			m_deqConnections.erase(
+				std::remove(m_deqConnections.begin(), m_deqConnections.end(), client), m_deqConnections.end());
 		}
 
 		// Send a message to a specific client
@@ -186,6 +230,7 @@ namespace net
 			size_t nMessageCount = 0;
 			while (nMessageCount < nMaxMessages && !m_qMessagesIn.empty())
 			{
+
 				// Grab the front message
 				auto msg = m_qMessagesIn.pop_front();
 
@@ -193,6 +238,8 @@ namespace net
 				OnMessage(msg.remote, msg.msg);
 
 				nMessageCount++;
+
+				// RemoveDisconnectedClients();
 			}
 		}
 
@@ -216,13 +263,6 @@ namespace net
 		virtual void OnMessage(std::shared_ptr<connection<T>> client, message<T>& msg)
 		{
 
-		}
-
-	public:
-
-		virtual void OnClientValidated(std::shared_ptr<connection<T>> client)
-		{
-			
 		}
 
 
