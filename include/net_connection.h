@@ -83,6 +83,10 @@ namespace net
 
 		void Send(const message<T>& msg)
 		{
+			// Reverse msg byte order
+
+			//const_cast<message<T>&>(msg).ReverseHeader();
+
 			asio::post(m_asioContext,
 				[this, msg]()
 				{
@@ -203,8 +207,12 @@ namespace net
 				{
 					if (!ec)
 					{
+						// Change endianness
+						ChangeEndian(m_msgTemporaryIn.header.size);
+
 						// A complete message header has been read, check if this message
 						// has a body to follow...
+
 						if (m_msgTemporaryIn.header.size > 0)
 						{
 							// ...it does, so allocate enough space in the messages' body

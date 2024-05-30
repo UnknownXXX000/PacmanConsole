@@ -101,7 +101,10 @@ namespace net
 		void Send(const message<T>& msg)
 		{
 			if (IsConnected())
+			{
+				// msg.SwapEndianness();
 				m_connection->Send(msg);
+			}
 		}
 
 	protected:

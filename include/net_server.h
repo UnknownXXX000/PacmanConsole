@@ -120,6 +120,7 @@ namespace net
 		// Send a message to a specific client
 		void MessageClient(std::shared_ptr<connection<T>> client, const message<T>& msg)
 		{
+			// msg.SwapEndianness();
 			// Check client is legitimate...
 			if (client && client->IsConnected())
 			{
@@ -145,6 +146,7 @@ namespace net
 		// Send message to all clients
 		void MessageAllClients(const message<T>& msg, std::shared_ptr<connection<T>> pIgnoreClient = nullptr)
 		{
+			// msg.SwapEndianness();
 			bool bInvalidClientExists = false;
 
 			// Iterate through all clients in container
@@ -188,6 +190,10 @@ namespace net
 			{
 				// Grab the front message
 				auto msg = m_qMessagesIn.pop_front();
+
+				// Restore byte order
+
+				//msg.msg.ReverseHeader();
 
 				// Pass to message handler
 				OnMessage(msg.remote, msg.msg);
