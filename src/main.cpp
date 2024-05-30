@@ -111,7 +111,7 @@ private:
 		offset_x += static_cast<int>(localPlayer->start_x);
 		offset_y += static_cast<int>(localPlayer->start_y);
 
-		if (offset_x >= 0 && offset_x < GameMap.GetWidth() && offset_y >= 0 && offset_y < GameMap.GetHeight() &&
+		if (offset_x >= 0 && offset_x < static_cast<int>(GameMap.GetWidth()) && offset_y >= 0 && offset_y < static_cast<int>(GameMap.GetHeight()) &&
 			(GameMap.at(offset_x, offset_y) == CellType::FOOD || GameMap.at(offset_x, offset_y) == CellType::EMPTY))
 		{
 			localPlayer->start_direction = dir;
