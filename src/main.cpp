@@ -1,7 +1,20 @@
 ﻿// PacmanConsole.cpp: определяет точку входа для приложения.
 //
 
+#ifndef ASIO_STANDALONE
+#define ASIO_STANDALONE
+#endif
+
+#define OLC_PGE_APPLICATION
+
+#include <olcPixelGameEngine.h>
+
+#define OLC_PGEX_TRANSFORMEDVIEW
+
+#include <olcPGEX_TransformedView.h>
+
 #include <includes.h>
+#include "game_structs.h"
 
 //#include "game_client.h"
 //#include "game_server.h"
@@ -38,7 +51,7 @@ private:
 		net::message<PTypes> clientReadyMsg;
 		clientReadyMsg.header.id = PTypes::CLIENT_READY;
 		// clientReadyMsg.SwapEndianness();
-		
+
 		clientReadyMsg.ReverseHeader();
 		Send(clientReadyMsg);
 	}
@@ -129,7 +142,7 @@ private:
 			// std::this_thread::sleep_for(100ms);
 			m_StartTime = std::chrono::system_clock::now();
 		}
-		
+
 	}
 
 public:
@@ -155,7 +168,7 @@ public:
 		}
 
 		if (foodLeft == 0) bGameOver = true;
-		if (bGameOver) 
+		if (bGameOver)
 		{
 			std::cout << "Your score: " << score << std::endl;
 			return false;
@@ -197,7 +210,7 @@ public:
 				case PTypes::SERVER_GAME_START:
 				{
 					bWaitingForRegistration = false;
-					if (!bReady) 
+					if (!bReady)
 					{
 						m_StartTime = std::chrono::system_clock::now();
 						bReady = true;
@@ -263,7 +276,7 @@ public:
 
 					GameMap(playerSent->start_x, playerSent->start_y) = CellType::EMPTY;
 
-					if		(OtherDir == PlayerMoves::UP)		playerSent->start_y--;
+					if (OtherDir == PlayerMoves::UP)		playerSent->start_y--;
 					else if (OtherDir == PlayerMoves::DOWN)		playerSent->start_y++;
 					else if (OtherDir == PlayerMoves::LEFT)		playerSent->start_x--;
 					else if (OtherDir == PlayerMoves::RIGHT)	playerSent->start_x++;
@@ -318,7 +331,7 @@ public:
 					case CellType::PLAYER:
 					{
 						if (vTile.x == localPlayer->start_x && vTile.y == localPlayer->start_y)
-							tv.FillRect(olc::vf2d(vTile) + olc::vf2d(0.2f, 0.2f), {0.8f, 0.8f}, olc::GREEN);
+							tv.FillRect(olc::vf2d(vTile) + olc::vf2d(0.2f, 0.2f), { 0.8f, 0.8f }, olc::GREEN);
 						else
 							tv.FillRect(olc::vf2d(vTile) + olc::vf2d(0.2f, 0.2f), { 0.8f, 0.8f }, olc::RED);
 						break;
@@ -633,13 +646,13 @@ protected:
 			}
 			case 2u:
 			{
-				newPlayer.start_x = 2u * GenMap.GetWidth()	- PlayerStartX - 1u;
+				newPlayer.start_x = 2u * GenMap.GetWidth() - PlayerStartX - 1u;
 				newPlayer.start_y = PlayerStartY;
 				break;
 			}
 			case 3u:
 			{
-				newPlayer.start_x = 2u * GenMap.GetWidth()	- PlayerStartX - 1u;
+				newPlayer.start_x = 2u * GenMap.GetWidth() - PlayerStartX - 1u;
 				newPlayer.start_y = 2u * GenMap.GetHeight() - PlayerStartY - 1u;
 				break;
 			}
@@ -708,7 +721,7 @@ protected:
 
 			break;
 		}
-		
+
 		default:
 		{
 			std::cout << "[GameServer] [" << client->GetID() << "] wrong packet id. Removing client\n";
@@ -759,33 +772,131 @@ protected:
 //	// socket.async_read_some(asio::buffer(vBuffer.data(), vBuffer.size()));
 //}
 
+void ParseArguments(int argc, char* argv[], std::string& program_type, std::string& program_playername, std::string& program_ip, uint16_t& program_port, uint32_t& program_playercount);
 
-
-int main(int argc, char * argv[])
+int main(int argc, char* argv[])
 {
+	std::string program_type;
+	std::string program_playername;
+	std::string program_ip;
+	uint16_t program_port;
+	uint32_t program_playercount;
 
-	argparse::ArgumentParser program("PacmanConsole");
-
-	program.add_argument("-t", "--type").help("decide if a program is a client or a server").default_value<std::string>(std::string("client")).nargs(1);
-	program.add_argument("-i", "--ip").help("if server, then decide the ip address the server will be running on. if client, then connect to a server with specific ip address").default_value<std::string>(std::string("127.0.0.1")).nargs(1);
-	program.add_argument("-p", "--port").help("the server will be listening on specific port, or a client will connect to a server running on a specific port").default_value<uint16_t>(60000).scan <'d', uint16_t>().nargs(1);
-
-	try
-	{
-		program.parse_args(argc, argv);
-	}
-	catch (const std::exception& err)
-	{
-		std::cerr << "Argparse failed. Error: " << err.what() << std::endl;
-		std::cerr << program;
-		return -1;
-	}
-
-	const auto program_type = program.get<std::string>("-t");
-	const auto program_ip = program.get<std::string>("-i");
-	const auto program_port = program.get<uint16_t>("-p");
+	ParseArguments(argc, argv, program_type, program_playername, program_ip, program_port, program_playercount);
 
 	std::cout << "Program type is " << program_type << ", ip address is " << program_ip << " and port is " << program_port << std::endl;
+
+	if (program_type == "server")
+	{
+		GameServer server(program_port, program_playercount);
+		server.Start();
+
+		while (1)
+		{
+			server.Update(-1, true);
+		}
+	}
+	else if (program_type == "client")
+	{
+		GameClient demo(program_playername, program_ip, program_port);
+		if (demo.Construct(480, 480, 1, 1))
+			demo.Start();
+	}
+
+	/*uint8_t arr[20 * 15];
+
+	{
+		FieldPart f;
+		f.GenerateMap();
+
+		std::cout << f << '\n';
+
+		f.WriteToCArray(arr);
+	}
+
+	net::message<PTypes> msg;
+
+	msg << arr;
+
+	FieldPart f1;
+	f1.GenerateMap();
+
+	f1(1, 1) = CellType::PLAYER;
+
+	std::cout << f1 << '\n';
+
+	std::memset(&arr[0], 0x0, sizeof(arr));
+
+	msg >> arr;
+
+	f1.ReadFromCArray(arr);
+
+	std::cout << f1 << '\n';*/
+
+	//uint8_t arr[10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+	//net::message<PTypes> msg;
+
+	//msg << arr;
+
+	//std::memset(&arr[0], 0x0, sizeof(arr));
+
+	//for (size_t i = 0; i < 10u; i++) std::cout << (uint32_t)arr[i] << ' ';
+	//std::cout << '\n';
+
+	//msg >> arr;
+
+	//for (size_t i = 0; i < 10u; i++) std::cout << (uint32_t)arr[i] << ' ';
+	//std::cout << '\n';
+
+	//Example demo;
+	//if (demo.Construct(256, 240, 4, 4))
+	//	demo.Start();
+
+	// GameField<20, 15> field;
+
+	// field.GenerateMap();
+
+	// MazeGenerator gen(field);
+
+	// std::cout << field << '\n';
+
+	//std::cout << std::hex << (static_cast<uint8_t>(CellType::EMPTY)		== 0x00)		<<
+	//				  " " << (static_cast<uint8_t>(CellType::FOOD)		== 0xaa)		<<
+	//				  " " << (static_cast<uint8_t>(CellType::PLAYER)	== 0x22)		<<
+	//				  " " << (static_cast<uint8_t>(CellType::WALL)		== 0xff)		<< '\n';
+
+	//GameField<20, 15> field;
+
+	//auto arr = field.GetBytes();
+
+	//std::cout << field << '\n';
+
+	//for (size_t j = 0; j < field.GetHeight(); j++)
+	//{
+	//	for (size_t i = 0; i < field.GetWidth(); i++)
+	//	{
+	//		std::cout << std::hex << uint32_t(arr.at(j * field.GetHeight() + i)) << '\t';
+	//	}
+	//	std::cout << '\n';
+	//}
+
+	// GameField<40, 30> BigField;
+
+	// field.GenerateSymmetricMap(BigField);
+
+	// auto field1 = field;
+	// field1.InvertHorizontal();
+	// 
+	// field.InsertToAnother(BigField, 0, 0);
+	// field1.InsertToAnother(BigField, field1.GetWidth(), 0);
+	// 
+	// field.InvertVertical();
+	// field.InsertToAnother(BigField, 0, field.GetHeight());
+	// 
+	// field1.InvertVertical();
+	// field1.InsertToAnother(BigField, field1.GetWidth(), field1.GetHeight());
+
+	// std::cout << BigField << '\n';
 
 	//net::message<net::PTypes> msg;
 
@@ -846,4 +957,39 @@ int main(int argc, char * argv[])
 
 
 	return 0;
+}
+
+void ParseArguments(int argc, char* argv[], std::string& program_type, std::string& program_playername, std::string& program_ip, uint16_t& program_port, uint32_t& program_playercount)
+{
+	argparse::ArgumentParser program("PacmanConsole");
+
+	program.add_argument("-t", "--type").help("decide if a program is a client or a server").default_value<std::string>(std::string("client")).nargs(1);
+	program.add_argument("-n", "--name").help("if type is a client then decide a player name").default_value<std::string>(std::string("Default")).nargs(1);
+	program.add_argument("-i", "--ip").help("if server, then decide the ip address the server will be running on. if client, then connect to a server with specific ip address").default_value<std::string>(std::string("127.0.0.1")).nargs(1);
+	program.add_argument("-p", "--port").help("the server will be listening on specific port, or a client will connect to a server running on a specific port").default_value<uint16_t>(60000).scan <'d', uint16_t>().nargs(1);
+	program.add_argument("-c", "--count").help("decide the amount of players, it can only be between 2 and 4").default_value<uint32_t>(2).scan<'d', uint32_t>().nargs(1);
+
+	try
+	{
+		program.parse_args(argc, argv);
+	}
+
+	catch (const std::exception& err)
+	{
+		std::cerr << "Argparse failed. Error: " << err.what() << std::endl;
+		std::cerr << program;
+		exit(-1);
+	}
+
+	program_type = program.get<std::string>("-t");
+	program_playername = program.get<std::string>("-n");
+	program_ip = program.get<std::string>("-i");
+	program_port = program.get<uint16_t>("-p");
+	program_playercount = program.get<uint32_t>("-c");
+
+	if (program_playername.empty())
+		program_playername = std::to_string(static_cast<uint32_t>(std::chrono::system_clock::now().time_since_epoch().count()));
+
+	if (program_playercount < 2 || program_playercount > 4)
+		program_playercount = (program_playercount % 3) + 2;
 }

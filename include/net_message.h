@@ -1,9 +1,10 @@
 #pragma once
 
 #include "net_common.h"
+// #include "stl_container_check.h"
 
-constexpr static uint32_t MAGIC			= 0xabcdfe01;
-constexpr static uint32_t MAGIC_LITTLE	= 0x01fecdab;
+constexpr static uint32_t MAGIC = 0xabcdfe01;
+constexpr static uint32_t MAGIC_LITTLE = 0x01fecdab;
 
 //template<typename T, typename std::enable_if_t<std::is_standard_layout_v<T>, T>* = nullptr>
 //constexpr inline void ChangeEndian(T& value);
@@ -33,7 +34,6 @@ void foo(const T& data)
 
 namespace net
 {
-
 	template<typename T>
 	class connection;
 
@@ -41,27 +41,31 @@ namespace net
 	template<typename T>
 	struct message_header
 	{
-		uint32_t magic = MAGIC;
-		T ptype{};
-		uint32_t datasize = 0;
+		uint32_t magic = 0xabcdfe01;
+		T id{};
+		uint32_t size = 0;
 	};
 
-	template<typename T>
+	// Message Body contains a header and a std::vector, containing raw bytes
+	// of infomation. This way the message can be variable length, but the size
+	// in the header must be updated.
+	template <typename T>
 	struct message
 	{
+		// Header & Body vector
 		message_header<T> header{};
-		std::vector<uint8_t> data;
+		std::vector<uint8_t> body;
 
 		// returns size of entire message packet in bytes
-		[[nodiscard]] size_t size() const noexcept
+		size_t size() const
 		{
-			return sizeof(message_header<T>) + data.size();
+			return body.size();
 		}
 
 		// Override for std::cout compatibility - produces friendly description of message
-		friend std::ostream& operator<<(std::ostream& os, const message<T>& msg)
+		friend std::ostream& operator << (std::ostream& os, const message<T>& msg)
 		{
-			os << "PType: " << static_cast<int>(msg.header.ptype) << " Size: " << msg.header.datasize;
+			os << "ID:" << static_cast<int>(msg.header.id) << " Size:" << msg.header.size;
 			return os;
 		}
 
@@ -79,13 +83,13 @@ namespace net
 			//static_assert(std::is_standard_layout_v<DataType>, "Data is too complex to be pushed into vector");
 
 			// Cache current size of vector, as this will be the point we insert the data
-			const size_t i = msg.data.size();
+			size_t i = msg.body.size();
 
 			// Resize the vector by the size of the data being pushed
-			msg.data.resize(i + sizeof(DataType));
+			msg.body.resize(msg.body.size() + sizeof(DataType));
 
 			// Physically copy the data into the newly allocated vector space
-			std::memcpy(msg.data.data() + i, &data, sizeof(DataType));
+			std::memcpy(msg.body.data() + i, &data, sizeof(DataType));
 
 			// Recalculate the message size
 			msg.header.size = msg.size();
@@ -144,10 +148,10 @@ namespace net
 		friend message<T>& operator >> (message<T>& msg, DataType& data)
 		{
 			// Cache the location towards the end of the vector where the pulled data starts
-			const size_t i = msg.data.size() - sizeof(DataType);
+			size_t i = msg.body.size() - sizeof(DataType);
 
 			// Physically copy the data from the vector into the user variable
-			std::memcpy(&data, msg.data.data() + i, sizeof(DataType));
+			std::memcpy(&data, msg.body.data() + i, sizeof(DataType));
 
 			ChangeEndian(data);
 
@@ -208,7 +212,7 @@ namespace net
 			ChangeEndian(data.player_name_len);
 
 			// Shrink the vector to remove read bytes, and reset end position
-			msg.data.resize(i);
+			msg.body.resize(i);
 
 			// Recalculate the message size
 			msg.header.size = msg.size();
@@ -226,6 +230,15 @@ namespace net
 		}
 	};
 
+
+	// An "owned" message is identical to a regular message, but it is associated with
+	// a connection. On a server, the owner would be the client that sent the message, 
+	// on a client the owner would be the server.
+
+	// Forward declare the connection
+	template <typename T>
+	class connection;
+
 	template <typename T>
 	struct owned_message
 	{
@@ -233,12 +246,11 @@ namespace net
 		message<T> msg;
 
 		// Again, a friendly string maker
-		friend std::ostream& operator<<(std::ostream& os, const owned_message<T>& msg_)
+		friend std::ostream& operator<<(std::ostream& os, const owned_message<T>& msg)
 		{
-			os << msg_.msg;
+			os << msg.msg;
 			return os;
 		}
 	};
 
-	
 }

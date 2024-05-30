@@ -1,5 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <mutex>
+#include <string>
+#include <unordered_set>
+
 #if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
 /* UNIX-style OS. ------------------------------------------- */
 #define IS_UNIX 1
@@ -8,33 +13,21 @@
 #define IS_WIN 1
 #endif
 
-#ifdef IS_WIN
-#define _WIN32_WINNT 0x0A00
-#endif
-
 #ifndef ASIO_STANDALONE
 #define ASIO_STANDALONE
 #endif
 
-#include <iostream>
-#include <chrono>
-#include <vector>
-#include <random>
-#include <string>
 
 // TODO: установите здесь ссылки на дополнительные заголовки, требующиеся для программы.
 
-#ifdef IS_UNIX
-    /* UNIX-style OS. ------------------------------------------- */
-#include <ncurses.h>
-#elif defined(IS_WIN)
-// Windows
-#include "../PDCurses/include/curses.h"
-#endif
+// #ifdef IS_UNIX
+//     /* UNIX-style OS. ------------------------------------------- */
+// #include <ncurses.h>
+// #elif defined(IS_WIN)
+// // Windows
+// #include "../PDCurses/include/curses.h"
+// #endif
 
 #include <argparse.hpp>
-#include <string>
 
-#include <asio.hpp>
-#include <asio/ts/buffer.hpp>
-#include <asio/ts/internet.hpp>
+#include "net_includes.h"

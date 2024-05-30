@@ -84,7 +84,7 @@ namespace net
 		}
 
 
-		[[nodiscard]] bool IsConnected() const noexcept
+		bool IsConnected() const noexcept
 		{
 			if (m_connection)
 				return m_connection->IsConnected();

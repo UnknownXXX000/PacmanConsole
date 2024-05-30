@@ -35,8 +35,13 @@ inline uint8_t convert(const CellType& c)
 }
 
 template<size_t WIDTH, size_t HEIGHT>
+class MazeGenerator;
+
+template<size_t WIDTH, size_t HEIGHT>
 class GameField
 {
+	// friend MazeGenerator<WIDTH, HEIGHT>;
+
 private:
 	union {
 		CellType field[WIDTH][HEIGHT];
@@ -46,18 +51,32 @@ private:
 	};
 	// std::mutex Mutex;
 public:
-	constexpr GameField() = default;
+	GameField()
+	{
+		fill(CellType::EMPTY);
+		//fill(CellType::WALL);
+		//for (size_t i = 0; i < WIDTH; i++)
+		//	for (size_t j = 0; j < HEIGHT; j++)
+		//		if ((i + j) % 2 == 0)
+		//			field[i][j] = CellType::FOOD;
+
+		//field[0][1] = CellType::PLAYER;
+		//field[1][2] = CellType::PLAYER;
+		//field[2][3] = CellType::PLAYER;
+
+	}
 	~GameField() = default;
 
 	GameField(const GameField&) = default;
 	GameField(GameField&&) noexcept = default;
 
-	[[nodiscard]] bool operator==(const GameField& other) const noexcept
+	bool operator==(const GameField& other) const
 	{
+		// std::scoped_lock lock(Mutex);
 		return (std::memcmp(&field, &other.field, WIDTH * HEIGHT) == 0);
 	}
 
-	[[nodiscard]] bool operator!=(const GameField& other) const noexcept
+	bool operator!=(const GameField& other) const
 	{
 		return !(*this == other);
 	}
@@ -65,54 +84,101 @@ public:
 	GameField& operator=(const GameField& other)
 	{
 		std::memcpy(&field, &other.field, WIDTH * HEIGHT);
+		// Mutex = other.Mutex;
 		return *this;
 	}
 
 	GameField& operator=(GameField&& other) noexcept
 	{
 		std::memcpy(&field, &other.field, WIDTH * HEIGHT);
+		// Mutex = std::move(other.Mutex);
 		return *this;
 	}
 
 	CellType& operator()(size_t x, size_t y)
 	{
-		static_assert(x < WIDTH && y < HEIGHT);
+		// std::scoped_lock lock(Mutex);
+		assert(x < WIDTH && y < HEIGHT);
 		return field[x][y];
 	}
 
 	const CellType& at(const size_t& x, const size_t& y) const
 	{
-		static_assert(x < WIDTH && y < HEIGHT);
+		// std::scoped_lock lock(Mutex);
+		assert(x < WIDTH && y < HEIGHT);
 		return field[x][y];
 	}
 
-	constexpr void fill(CellType value)
+	bool isEmpty(size_t x, size_t y) const
 	{
-		std::memset(&field[0], value, WIDTH * HEIGHT);
+		// std::scoped_lock lock(Mutex);
+		assert(x < WIDTH && y < HEIGHT);
+		return field[x][y] == CellType::EMPTY || field[x][y] == CellType::FOOD;
 	}
 
-	[[nodiscard]] constexpr size_t GetWidth() const noexcept
+	size_t countFood() const
 	{
+		// std::scoped_lock lock(Mutex);
+		size_t cnt = 0;
+
+		for (size_t i = 0; i < WIDTH; i++)
+			for (size_t j = 0; j < HEIGHT; j++)
+				if (field[i][j] == CellType::FOOD)
+					cnt++;
+
+		return cnt;
+	}
+
+private:
+	void fill(CellType value)
+	{
+		std::memset(&field[0], static_cast<int32_t>(value), WIDTH * HEIGHT);
+	}
+
+public:
+	size_t GetWidth() const noexcept
+	{
+		// // std::scoped_lock lock(Mutex);
 		return WIDTH;
 	}
 
-	[[nodiscard]] constexpr size_t GetHeight() const noexcept
+	size_t GetHeight() const noexcept
 	{
+		// // std::scoped_lock lock(Mutex);
 		return HEIGHT;
 	}
 
+	constexpr const size_t ConstexprWidth() const noexcept
+	{
+		// std::scoped_lock(Mutex);
+		return WIDTH;
+	}
+
+	constexpr const size_t ConstexprHeight() const noexcept
+	{
+		// std::scoped_lock(Mutex);
+		return HEIGHT;
+	}
+
+private:
 	void InvertVertical()
 	{
-		static_assert(HEIGHT % 2 == 0);
+		// static_assert(HEIGHT % 2 == 0, "Incompatible");
 
-		for (size_t i = 0; i < WIDTH; i++)
-			for (size_t j = 0; j < HEIGHT / 2; j++)
-				std::swap(field[i][j], field[i][HEIGHT - j]);
+		for (size_t j = 0; j < HEIGHT / 2; j++)
+			for (size_t i = 0; i < WIDTH; i++)
+			{
+				// std::cout << "exchange cell (" << i << ", " << j << ") with cell (" << i << ", " << HEIGHT - j - 1 << ")\n";
+				const auto temp = field[i][j];
+				// std::swap(field[i][j], field[i][HEIGHT - j]);
+				field[i][j] = field[i][HEIGHT - j - 1];
+				field[i][HEIGHT - j - 1] = temp;
+			}
 	}
 
 	void InvertHorizontal()
 	{
-		static_assert(WIDTH % 2 == 0);
+		// static_assert(WIDTH % 2 == 0, "Incompatible");
 
 		for (size_t j = 0; j < HEIGHT; j++)
 			for (size_t i = 0; i < WIDTH / 2; i++)
@@ -134,7 +200,7 @@ public:
 				other(i + offset_x, j + offset_y) = field[i][j];
 	}
 
-	public:
+public:
 	friend std::ostream& operator<<(std::ostream& os, const GameField& f)
 	{
 		for (size_t j = 0; j < f.GetHeight(); j++)
@@ -144,20 +210,20 @@ public:
 				char c = '\0';
 				switch (f.at(i, j))
 				{
-					case CellType::EMPTY:
-						c = ' ';
-						break;
-					case CellType::WALL:
-						c = '*';
-						break;
-					case CellType::FOOD:
-						c = '0';
-						break;
-					case CellType::PLAYER:
-						c = '+';
-						break;
-					default:
-						break;
+				case CellType::EMPTY:
+					c = ' ';
+					break;
+				case CellType::WALL:
+					c = '*';
+					break;
+				case CellType::FOOD:
+					c = '0';
+					break;
+				case CellType::PLAYER:
+					c = '+';
+					break;
+				default:
+					break;
 				}
 				os << c;
 			}
@@ -186,16 +252,16 @@ public:
 		}
 	}
 
-	public:
-	std::array<uint8_t, WIDTH * HEIGHT> ToBytes() const noexcept
+public:
+	std::array<uint8_t, WIDTH* HEIGHT> ToBytes() const noexcept
 	{
 		// std::scoped_lock lock(Mutex);
-		std::array<uint8_t, WIDTH * HEIGHT> byteArray;
+		std::array<uint8_t, WIDTH* HEIGHT> byteArray;
 		std::memcpy(byteArray.data(), &bytes[0], WIDTH * HEIGHT);
 		return byteArray;
 	}
 
-	void FromBytes(const std::array<uint8_t, WIDTH * HEIGHT>& byteArray)
+	void FromBytes(const std::array<uint8_t, WIDTH* HEIGHT>& byteArray)
 	{
 		// std::scoped_lock lock(Mutex);
 		std::memcpy(&bytes[0], byteArray.data(), WIDTH * HEIGHT);
@@ -290,11 +356,11 @@ private:
 	  {{0,0}, {1,0}, {1,1}, {2,0}}, // T shape
 	  {{0,0}, {1,0}, {1,1}, {2,1}}  // S shape
 	};
-	
+
 public:
 	MazeGenerator() = delete;
 	~MazeGenerator() = default;
-	
+
 	MazeGenerator(const MazeGenerator&) = delete;
 	MazeGenerator(MazeGenerator&&) noexcept = delete;
 	MazeGenerator& operator=(const MazeGenerator&) = delete;
